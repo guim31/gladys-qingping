@@ -1,61 +1,130 @@
-# Demo Devices Template
+# Qingping
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+## Overview
 
-## What you get
+This integration brings your **Qingping air monitors and thermometers** into Gladys, through the official **Qingping cloud API** — the cloud the Qingping+ app uses. Every device of your Qingping account becomes a Gladys device with what it measures: temperature, humidity, CO₂, PM2.5, PM10, VOC, noise, pressure, battery, and the age of the latest reading.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+On top of the values, it gives you a readable **air quality level** (Good, Moderate, Poor, Very poor) with the pollutant behind it, a **dashboard widget**, **scene triggers** when the air quality changes or a device stops reporting, and a **scene action** to read the air quality in words.
+
+Models it is meant for: Qingping Air Monitor Lite, Air Monitor 2, CO₂ Temp & RH Monitor, the Wi-Fi thermo-hygrometers (with or without probe), the Lee Guitars hygrometer, and the Bluetooth sensors synced through a Qingping gateway or the app. Any device the API returns is supported: the features follow the metrics it reports.
+
+Developed without the hardware: feedback welcome. The integration was written from the Qingping API documentation and the open-source clients of the community, and tested against a simulated cloud. If something looks wrong with your device, please open an issue on [github.com/guim31/gladys-qingping/issues](https://github.com/guim31/gladys-qingping/issues).
+
+This integration is not affiliated with Qingping (Qingping Technology / ClearGrass). Qingping is their trademark.
+
+## Requirements
+
+- Gladys Assistant 5.1.0 or later.
+- Your devices added in the **Qingping+** app, in **Qingping mode** (a device paired in HomeKit mode does not upload to the Qingping cloud).
+- A free developer access on [developer.qingping.co](https://developer.qingping.co), with the same account as the app.
+- Gladys must reach the Internet (`oauth.cleargrass.com` and `apis.cleargrass.com`, HTTPS).
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+### Getting the App Key and App Secret
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+1. Add your devices in the Qingping+ app and check that they show values there.
+2. Log in to [developer.qingping.co](https://developer.qingping.co) with the account of the app (same region).
+3. Open **Access Management** ([direct link](https://developer.qingping.co/personal/permissionApply)) and copy the **App Key** and the **App Secret**. It is free.
 
-## Actions
+### Settings
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+- **App Key** and **App Secret**: copied from Access Management. The secret is stored by Gladys and never written to the logs.
+- **Cloud reading**: _Automatic (recommended)_ reads the cloud right after each upload the devices are expected to make, from their report interval. A fixed interval (5 minutes to an hour) can be chosen instead.
+- **Language of the device features**: the names given to the features when you add a device (they are frozen afterwards), and the language of the texts sent to scenes. French by default.
 
-## Scenes
+Click **Test the connection**: the result lists your devices and the age of their latest reading. Then open the **Discovery** tab and add the devices you want.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+**How often the values change.** The cloud only knows what the devices uploaded. An air monitor on battery uploads every **15 minutes** by default (the report interval of the Qingping+ app); plugged in, it can upload every minute. A Bluetooth thermometer uploads when the app or a gateway syncs it. Reading the cloud more often brings no fresher value, so in automatic mode the integration reads it once per expected upload — never more than every 2 minutes, never less than every hour. One request reads every device of the account.
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+**Quotas.** Qingping publishes no request quota for its open API. The integration makes one token request about every 2 hours (the token is kept in `/data`, so a restart does not ask for a new one) and one request per reading — about 100 a day with a 15-minute report interval. When the cloud answers "too many requests" it waits at least 15 minutes, or longer if the cloud asks.
 
-## Dashboard
+## Devices
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+One Gladys device per device of your Qingping account, named as in the Qingping+ app. Its identity is its MAC address: renaming it in the app keeps it in Gladys.
+
+### Features
+
+Each device gets the features of the metrics it reports, all read-only:
+
+| Feature           | Unit  | Models                                        |
+| ----------------- | ----- | --------------------------------------------- |
+| Temperature       | °C    | all                                           |
+| Probe temperature | °C    | thermometers with an external probe           |
+| Humidity          | %     | all                                           |
+| CO₂               | ppm   | air monitors, CO₂ monitor                     |
+| PM2.5             | µg/m³ | air monitors                                  |
+| PM10              | µg/m³ | air monitors                                  |
+| VOC               | ppb   | Air Monitor (first generation)                |
+| VOC index         | 1–500 | Air Monitor 2 (100 = the room's usual air)    |
+| Noise             | dB    | Air Monitor 2                                 |
+| Pressure          | kPa   | thermometers with a barometer                 |
+| Battery           | %     | battery devices                               |
+| Reading age       | min   | all: minutes since the device's latest upload |
+
+**Reading age** tells a stable value from a frozen one: if it grows past twice the report interval, the device stopped uploading (battery, Wi-Fi, out of range). The device badge then turns "unreachable".
+
+A metric a device starts to report later (a sensor warming up after a restart) adds its feature: Gladys then offers **Update** in the Discovery tab. A sensor that reports itself out of order or warming up publishes nothing, rather than a wrong value.
+
+### Air quality level
+
+Each monitor gets an air quality level, the worst of its pollutants:
+
+| Level     | CO₂ (ppm)   | PM2.5 (µg/m³) | PM10 (µg/m³) | VOC (ppb)   | VOC index  |
+| --------- | ----------- | ------------- | ------------ | ----------- | ---------- |
+| Good      | under 800   | under 15      | under 45     | under 220   | under 150  |
+| Moderate  | 800–999     | 15–34         | 45–99        | 220–659     | 150–249    |
+| Poor      | 1000–1999   | 35–54         | 100–199      | 660–2199    | 250–399    |
+| Very poor | 2000 and up | 55 and up     | 200 and up   | 2200 and up | 400 and up |
+
+The thresholds follow the indoor guide values of the German Environment Agency (CO₂, VOC), the WHO 2021 guidelines and the US EPA breakpoints (particles). To avoid flapping, a level only goes back down once the value is 5 % under the threshold it crossed. Temperature, humidity and noise do not count: they are comfort, not air quality. A thermometer has no air quality level.
+
+## Dashboard widget
+
+**Qingping air quality**: add it to a dashboard and pick a device, or leave the device empty to see all of them.
+
+- One device: its name, up to six tiles (CO₂, PM2.5, temperature, humidity, PM10, VOC…) colored by level, then the air quality in words with its cause (for example _Poor · CO₂_), the age of the latest reading, and the battery.
+- All devices: one line per device with its air quality, or its temperature and humidity for a thermometer.
+
+A device that stopped uploading shows _No recent reading_ instead of a frozen level. The widget works even before the devices are added to Gladys.
+
+## Scene triggers
+
+- **Air quality changed**: the level of a monitor changed. Filters: the monitor, the new level, the direction (_Getting worse_ or _Getting better_). Variables: monitor name, level, previous level, main pollutant, direction, CO₂ and PM2.5.
+- **Device stopped reporting**: no new reading for two report intervals (at least 30 minutes), or the Qingping cloud says the device is offline. Variables: device name, minutes since the last reading, offline for Qingping.
+- **Device reporting again**: a device that had stopped reporting sent a new reading. Variable: minutes without reading.
+
+To react to a value crossing a threshold (CO₂ above 1200 ppm, temperature below 5 °C), use the usual Gladys trigger on the device feature: it already compares values.
+
+## Scene action
+
+**Get the air quality**: reads the air quality of a monitor from its latest reading (no request to the cloud) and gives the next actions of the scene: the level (code, number from 1 Good to 4 Very poor, and label), the main pollutant, CO₂, PM2.5, the minutes since the reading and whether the reading is recent. Use it in a message (_"Air in the bedroom: {level}"_) or in a "continue only if" condition.
+
+## Configuration actions
+
+- **Test the connection**: reads the cloud now and lists the devices with the age of their reading.
+- **Set the report interval**: changes how often an **air monitor** uploads (1 minute to 1 hour). The device applies it at its next upload, and the integration follows the new pace. A short interval drains the battery much faster: keep 15 minutes on battery. The other devices (thermometers) are set in the Qingping+ app.
+
+## Scene examples
+
+- **Ventilate the bedroom**: trigger _Air quality changed_, monitor _Bedroom_, new level _Poor_ and _Very poor_, direction _Getting worse_ → send a message "Open the bedroom window: {main pollutant} is high", or turn on the ventilation.
+- **Air is good again**: trigger _Air quality changed_, new level _Good_, direction _Getting better_ → turn the ventilation off.
+- **Check the monitor**: trigger _Device stopped reporting_ → send a message "{device name} has not reported for {minutes} min: battery or Wi-Fi?".
+- **Morning report**: every day at 7:00 → _Get the air quality_ of the bedroom → send "Bedroom air: {level}, CO₂ {co2} ppm".
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"App Key or App Secret refused"**: copy both again from Access Management, without spaces, then save. Check you logged in to developer.qingping.co with the account of the app.
+- **Connected, but no device**: the devices must be in the Qingping+ app of the same account, in Qingping mode (not HomeKit). A device only paired in HomeKit does not reach the Qingping cloud.
+- **Values do not move**: look at _Reading age_. If it grows, the device does not upload (battery, Wi-Fi, gateway). If it stays low, the values are just stable.
+- **A feature is missing**: wait for a reading where the sensor reports it (a CO₂ sensor warms up for a few minutes after a restart), then click **Update** on the device in the Discovery tab.
+- **More detail**: set `LOG_LEVEL=debug` on the integration to see every reading in its logs. The App Secret and the token never appear there.
+
+## Limits
+
+- Cloud only: the integration reads the Qingping cloud, never the devices on your network. Without Internet, the values stop (the devices keep their own history in the cloud).
+- The values are as fresh as the uploads of the devices: 15 minutes by default on battery.
+- Read-only: the only setting the integration changes is the report interval of the air monitors, on demand.
+- A history gap while Gladys was off is not filled back: only the latest reading is read.
+- The devices that the Qingping cloud does not expose (HomeKit mode, some Bluetooth-only sensors without a gateway) cannot appear.
+- Developed without the hardware nor an account: the API answers were reconstructed from the Qingping documentation and community clients. Report anything odd on [github.com/guim31/gladys-qingping/issues](https://github.com/guim31/gladys-qingping/issues).

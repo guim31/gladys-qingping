@@ -1,77 +1,131 @@
+// -----------------------------------------------------------------------------
+// The `air_quality` dashboard widget: rendered exactly as sent (the SDK's
+// validator: vocabulary and budget), in the four languages, for one device
+// and for all of them, and the empty and error states.
+// -----------------------------------------------------------------------------
+
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateWidgetContent } from '@gladysassistant/integration-sdk';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { buildDiscoveredDevices } from '../src/devices/index.js';
-import { simulateLanSession } from '../src/devices/plug.js';
-import { DEMO_STATUS_WIDGET, WIDGETS, refreshWidgets } from '../src/widgets.js';
-import { normalizeConfig } from '../src/config.js';
+import { ERROR_TEXT } from '../src/texts.js';
+import { formatNumber } from '../src/widgets.js';
+import {
+  CELLAR,
+  DEFAULT_TEST_CONFIG,
+  FakeQingping,
+  LIVING,
+  OFFICE,
+  createWorld,
+  deviceId,
+} from './helpers/world.js';
 
-const gladys = createFakeGladys();
-const config = normalizeConfig();
-const demoStatus = WIDGETS[DEMO_STATUS_WIDGET];
+const MIN = 60_000;
 
-// What the SDK passes to onWidgetGet, plus the config index.js adds.
-const getContent = (cfg = config) =>
-  demoStatus.get(gladys, { settings: {}, language: 'en', units: 'metric', config: cfg });
+async function world(t, options) {
+  const w = await createWorld(options);
+  t.after(() => w.app.stop());
+  return w;
+}
 
-test('the demo_status content is rendered exactly as sent', async () => {
-  // [] = nothing the core would drop, truncate or trim to the content budget.
-  assert.deepEqual(validateWidgetContent(await getContent()), []);
-});
+async function content(w, settings = {}, language = 'en') {
+  const ack = await w.fake.widgetGet('air_quality', { settings, language, units: 'metric' });
+  assert.equal(ack.success, true, ack.error);
+  assert.deepEqual(validateWidgetContent(ack.data.content), [], 'rendered as sent');
+  return ack.data.content;
+}
 
-test('the degraded plug connection content is valid too', async () => {
-  simulateLanSession(false);
-  try {
-    const content = await getContent();
-    assert.deepEqual(validateWidgetContent(content), []);
-    const status = content.components.find((component) => component.type === 'status');
-    assert.ok(
-      status.items.some((item) => item.color === 'warning'),
-      'degraded shows a warning',
-    );
-  } finally {
-    simulateLanSession(true);
-  }
-});
+const byType = (c, type) => c.components.filter((component) => component.type === type);
 
-test('the live tiles reference features the integration publishes', async () => {
-  const featureIds = new Set(
-    buildDiscoveredDevices(gladys, config).flatMap((device) =>
-      device.features.map((feature) => feature.external_id),
-    ),
+test('one device: its name, its figures as tiles, air quality, reading age, battery', async (t) => {
+  const w = await world(t);
+  const c = await content(w, { device: deviceId(w.gladys, LIVING) });
+  assert.deepEqual(byType(c, 'text'), [{ type: 'text', variant: 'heading', text: 'Living room' }]);
+  assert.deepEqual(
+    byType(c, 'value').map(({ label, value, unit, color }) => [label, value, unit, color]),
+    [
+      ['CO₂', 1053, 'ppm', 'danger'],
+      ['PM2.5', 12, 'µg/m³', 'success'],
+      ['Temperature', 26.4, '°C', undefined],
+      ['Humidity', 44, '%', undefined],
+      ['PM10', 12, 'µg/m³', 'success'],
+    ],
   );
-  const liveTiles = (await getContent()).components.filter((c) => c.device_feature);
-  assert.ok(liveTiles.length > 0, 'the template demonstrates a device-bound tile');
-  for (const tile of liveTiles) {
-    assert.ok(featureIds.has(tile.device_feature), `unknown feature ${tile.device_feature}`);
+  const [status] = byType(c, 'status');
+  assert.deepEqual(status.items, [
+    { label: 'Air quality', icon: 'wind', value: 'Poor · CO₂', color: 'danger' },
+    { label: 'Latest reading', icon: 'clock', value: '10 min ago', color: 'neutral' },
+    { label: 'Battery', icon: 'battery', value: '100 %', color: 'neutral' },
+  ]);
+  assert.ok(c.ttl_seconds >= 60);
+});
+
+test('at most six tiles, within the budget, for the richest monitor', async (t) => {
+  const w = await world(t);
+  const c = await content(w, { device: deviceId(w.gladys, OFFICE) }, 'de');
+  assert.equal(byType(c, 'value').length, 6);
+  assert.ok(c.components.length <= 8);
+  assert.equal(byType(c, 'status')[0].items[0].value, 'Gut');
+});
+
+test('every device: one row each, in the language of the user', async (t) => {
+  const w = await world(t);
+  const c = await content(w, {}, 'fr');
+  assert.equal(c.components.length, 1);
+  assert.deepEqual(byType(c, 'status')[0].items, [
+    { label: 'Living room', icon: 'wind', value: 'Mauvaise · CO₂', color: 'danger' },
+    { label: 'Bedroom', icon: 'wind', value: 'Moyenne · CO₂', color: 'warning' },
+    { label: 'Office', icon: 'wind', value: 'Bonne', color: 'success' },
+    { label: 'Cellar', icon: 'thermometer', value: '13,7 °C · 78 %', color: 'neutral' },
+  ]);
+  for (const language of ['en', 'de', 'es']) {
+    await content(w, {}, language);
   }
 });
 
-test('every button action of the content is handled and answers a short toast', async () => {
-  const buttons = (await getContent()).components.filter((c) => c.type === 'button' && c.action);
-  assert.ok(buttons.length > 0, 'the template demonstrates a widget action');
-  for (const { action } of buttons) {
-    const message = await demoStatus.action(gladys, {
-      actionKey: action.key,
-      params: action.params ?? {},
-      settings: {},
-      config,
-    });
-    assert.ok(message.en, 'the toast carries at least the mandatory `en` text');
-    assert.ok(message.en.length <= 200, 'toasts are capped at 200 characters');
-  }
+test('a stale or offline device says so instead of a frozen level', async (t) => {
+  const w = await world(t);
+  w.clock.advance(3 * 60 * MIN);
+  w.cloud.device(OFFICE).info.status.offline = true;
+  await w.hub.pollAll();
+  const c = await content(w, {}, 'en');
+  const rows = byType(c, 'status')[0].items;
+  assert.deepEqual(rows[0], {
+    label: 'Living room',
+    icon: 'alert-triangle',
+    value: 'No recent reading',
+    color: 'warning',
+  });
+  assert.equal(rows[2].value, 'Offline');
+  const detail = await content(w, { device: deviceId(w.gladys, CELLAR) }, 'es');
+  assert.equal(byType(detail, 'status')[0].items.at(-2).value, 'Sin medida reciente');
+  assert.equal(byType(detail, 'status')[0].items.at(-1).color, 'warning', 'battery at 15 %');
 });
 
-test('an unknown widget action fails, so the user sees the error', async () => {
-  await assert.rejects(
-    demoStatus.action(gladys, { actionKey: 'unknown', params: {}, settings: {}, config }),
-    /Unknown widget action/,
-  );
+test('empty account, missing keys, unknown device', async (t) => {
+  const empty = await world(t, { cloud: new FakeQingping({ devices: 'devices-empty' }) });
+  assert.match((await content(empty)).components[0].text, /No Qingping device/);
+
+  const noKeys = await world(t, { config: { language: 'en' } });
+  assert.equal((await content(noKeys)).components[0].text, ERROR_TEXT.config.en);
+
+  const w = await world(t, { config: DEFAULT_TEST_CONFIG });
+  const unknown = await content(w, { device: deviceId(w.gladys, '582D34FFFFFF') });
+  assert.match(unknown.components[0].text, /no longer on the Qingping account/);
 });
 
-test('refreshWidgets nudges every widget', () => {
-  const fresh = createFakeGladys();
-  refreshWidgets(fresh);
-  assert.deepEqual(fresh.fake.widgetRefreshes, Object.keys(WIDGETS));
+test('a new reading asks the dashboards to refresh', async (t) => {
+  const w = await world(t);
+  const before = w.fake.widgetRefreshes.length;
+  w.clock.advance(MIN);
+  await w.hub.pollAll();
+  assert.equal(w.fake.widgetRefreshes.length, before, 'nothing new, no nudge');
+  w.cloud.upload(LIVING, Math.floor(w.clock.now() / 1000), { co2: 700 });
+  await w.hub.pollAll();
+  assert.equal(w.fake.widgetRefreshes.at(-1), 'air_quality');
+});
+
+test('numbers are written the way each language writes them', () => {
+  assert.equal(formatNumber(21.44, 1, 'en'), '21.4');
+  assert.equal(formatNumber(21.44, 1, 'fr'), '21,4');
+  assert.equal(formatNumber(78.2, 0, 'de'), '78');
 });

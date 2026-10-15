@@ -30,6 +30,24 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+What the integration handles:
+
+- **Secrets**: the Qingping App Key and App Secret are fields of the Gladys
+  configuration (the App Secret a `secret` field). The integration reads them
+  from Gladys at startup, keeps them in memory, sends them only to the Qingping
+  token endpoint (`https://oauth.cleargrass.com/oauth2/token`, HTTP Basic), and
+  never writes them to `/data` nor to the logs.
+- **Stored in `/data`**: `qingping-state.json`, readable by its owner only
+  (mode 0600): the current access token of the Qingping API with its expiry
+  and a fingerprint (truncated SHA-256) of the keys it was issued for, and the
+  list of metrics each device has reported. The token gives read access to the
+  devices of the account and lets change their report interval; it expires
+  after about two hours. Removing the file is harmless.
+- **Network**: requests go only to the Qingping cloud
+  (`oauth.cleargrass.com`, `apis.cleargrass.com`), in HTTPS with the
+  certificates verified. The integration opens no port and never talks to the
+  devices on the local network.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+the Qingping cloud and devices, and the other services of your network.

@@ -1,177 +1,770 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Qingping",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Qingping air monitors and thermometers via the Qingping cloud: CO₂, particles, VOC, temperature.",
+    "fr": "Moniteurs d'air et thermomètres Qingping via le cloud Qingping : CO₂, particules, COV, température.",
+    "de": "Qingping-Luftmonitore und Thermometer über die Qingping-Cloud: CO₂, Feinstaub, VOC, Temperatur.",
+    "es": "Monitores de aire y termómetros Qingping vía la nube Qingping: CO₂, partículas, COV, temperatura."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-qingping:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-qingping/main/cover.png",
+  "categories": ["environment"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Your Qingping account",
+        "fr": "Votre compte Qingping",
+        "de": "Dein Qingping-Konto",
+        "es": "Su cuenta Qingping"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Free. Log in to developer.qingping.co with your Qingping+ app account, open Access Management and copy the App Key and App Secret. Devices must be bound in the Qingping+ app (Qingping mode, not HomeKit).",
+        "fr": "Gratuit. Connectez-vous à developer.qingping.co avec le compte de l'appli Qingping+, ouvrez Access Management et copiez l'App Key et l'App Secret. Les appareils doivent être ajoutés dans l'appli Qingping+ (mode Qingping, pas HomeKit).",
+        "de": "Kostenlos. Melde dich mit dem Konto der Qingping+-App auf developer.qingping.co an, öffne Access Management und kopiere App Key und App Secret. Die Geräte müssen in der Qingping+-App eingebunden sein (Qingping-Modus, nicht HomeKit).",
+        "es": "Gratuito. Inicie sesión en developer.qingping.co con la cuenta de la aplicación Qingping+, abra Access Management y copie la App Key y el App Secret. Los dispositivos deben estar en la aplicación Qingping+ (modo Qingping, no HomeKit)."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://developer.qingping.co/personal/permissionApply",
+          "label": {
+            "en": "Qingping Access Management",
+            "fr": "Gestion des accès Qingping",
+            "de": "Qingping-Zugriffsverwaltung",
+            "es": "Gestión de accesos de Qingping"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "app_key",
+      "type": "string",
+      "label": {
+        "en": "App Key",
+        "fr": "App Key",
+        "de": "App Key",
+        "es": "App Key"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "description": {
+        "en": "The App Key shown in Access Management on developer.qingping.co.",
+        "fr": "L'App Key affichée dans Access Management sur developer.qingping.co.",
+        "de": "Der App Key aus Access Management auf developer.qingping.co.",
+        "es": "La App Key que aparece en Access Management en developer.qingping.co."
+      },
+      "placeholder": {
+        "en": "e.g. 7Jk2Qx…",
+        "fr": "ex. 7Jk2Qx…",
+        "de": "z. B. 7Jk2Qx…",
+        "es": "p. ej. 7Jk2Qx…"
+      },
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "default": ""
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+      "key": "app_secret",
+      "type": "secret",
+      "label": {
+        "en": "App Secret",
+        "fr": "App Secret",
+        "de": "App Secret",
+        "es": "App Secret"
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
+      "description": {
+        "en": "The App Secret next to the App Key. Kept by Gladys, never written to the logs.",
+        "fr": "L'App Secret, à côté de l'App Key. Conservé par Gladys, jamais écrit dans les logs.",
+        "de": "Das App Secret neben dem App Key. Von Gladys gespeichert, nie in die Protokolle geschrieben.",
+        "es": "El App Secret, junto a la App Key. Gladys lo guarda y nunca aparece en los registros."
+      },
+      "required": true
     },
     {
-      "key": "unit",
+      "key": "poll_interval",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Cloud reading",
+        "fr": "Lecture du cloud",
+        "de": "Abfrage der Cloud",
+        "es": "Lectura de la nube"
+      },
+      "description": {
+        "en": "Automatic: right after each upload the devices are expected to make (their report interval, set in the Qingping+ app). Reading faster brings no fresher value.",
+        "fr": "Automatique : juste après chaque remontée attendue des appareils (leur intervalle de remontée, réglé dans l'appli Qingping+). Lire plus souvent n'apporte aucune valeur plus fraîche.",
+        "de": "Automatisch: direkt nach jeder erwarteten Übertragung der Geräte (ihr Sendeintervall aus der Qingping+-App). Häufigere Abfragen bringen keine frischeren Werte.",
+        "es": "Automático: justo después de cada envío previsto de los dispositivos (su intervalo de envío, ajustado en la aplicación Qingping+). Leer más a menudo no aporta valores más recientes."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "auto",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "auto",
+          "label": {
+            "en": "Automatic (recommended)",
+            "fr": "Automatique (conseillé)",
+            "de": "Automatisch (empfohlen)",
+            "es": "Automático (recomendado)"
+          }
+        },
+        {
+          "value": "5",
+          "label": {
+            "en": "Every 5 minutes",
+            "fr": "Toutes les 5 minutes",
+            "de": "Alle 5 Minuten",
+            "es": "Cada 5 minutos"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "Every 10 minutes",
+            "fr": "Toutes les 10 minutes",
+            "de": "Alle 10 Minuten",
+            "es": "Cada 10 minutos"
+          }
+        },
+        {
+          "value": "15",
+          "label": {
+            "en": "Every 15 minutes",
+            "fr": "Toutes les 15 minutes",
+            "de": "Alle 15 Minuten",
+            "es": "Cada 15 minutos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "Every 30 minutes",
+            "fr": "Toutes les 30 minutes",
+            "de": "Alle 30 Minuten",
+            "es": "Cada 30 minutos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "Every hour",
+            "fr": "Toutes les heures",
+            "de": "Jede Stunde",
+            "es": "Cada hora"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the device features",
+        "fr": "Langue des fonctionnalités",
+        "de": "Sprache der Gerätefunktionen",
+        "es": "Idioma de las funciones"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Names given to the features when a device is added, and language of the scene texts.",
+        "fr": "Noms donnés aux fonctionnalités à l'ajout d'un appareil, et langue des textes des scènes.",
+        "de": "Namen der Funktionen beim Hinzufügen eines Geräts und Sprache der Szenentexte.",
+        "es": "Nombres de las funciones al añadir un dispositivo e idioma de los textos de escenas."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "timeout_seconds": 60
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "set_report_interval",
+      "label": {
+        "en": "Set the report interval",
+        "fr": "Régler l'intervalle de remontée",
+        "de": "Sendeintervall einstellen",
+        "es": "Ajustar el intervalo de envío"
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Air monitor",
+            "fr": "Moniteur d'air",
+            "de": "Luftmonitor",
+            "es": "Monitor de aire"
+          },
+          "description": {
+            "en": "Air monitors only. A short interval drains the battery much faster.",
+            "fr": "Moniteurs d'air seulement. Un intervalle court vide la batterie bien plus vite.",
+            "de": "Nur Luftmonitore. Ein kurzes Intervall leert den Akku viel schneller.",
+            "es": "Solo monitores de aire. Un intervalo corto agota la batería mucho más rápido."
+          }
+        },
+        {
+          "key": "minutes",
+          "type": "select",
+          "label": {
+            "en": "Upload every",
+            "fr": "Remonter toutes les",
+            "de": "Senden alle",
+            "es": "Enviar cada"
+          },
+          "options": [
+            {
+              "value": "1",
+              "label": {
+                "en": "1 minute",
+                "fr": "1 minute",
+                "de": "1 Minute",
+                "es": "1 minuto"
+              }
+            },
+            {
+              "value": "5",
+              "label": {
+                "en": "5 minutes",
+                "fr": "5 minutes",
+                "de": "5 Minuten",
+                "es": "5 minutos"
+              }
+            },
+            {
+              "value": "10",
+              "label": {
+                "en": "10 minutes",
+                "fr": "10 minutes",
+                "de": "10 Minuten",
+                "es": "10 minutos"
+              }
+            },
+            {
+              "value": "15",
+              "label": {
+                "en": "15 minutes",
+                "fr": "15 minutes",
+                "de": "15 Minuten",
+                "es": "15 minutos"
+              }
+            },
+            {
+              "value": "30",
+              "label": {
+                "en": "30 minutes",
+                "fr": "30 minutes",
+                "de": "30 Minuten",
+                "es": "30 minutos"
+              }
+            },
+            {
+              "value": "60",
+              "label": {
+                "en": "1 hour",
+                "fr": "1 heure",
+                "de": "1 Stunde",
+                "es": "1 hora"
+              }
+            }
+          ]
         }
       ]
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "air_quality_changed",
+      "label": {
+        "en": "Air quality changed",
+        "fr": "Qualité de l'air changée",
+        "de": "Luftqualität geändert",
+        "es": "Calidad del aire cambiada"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "The air quality level of a monitor changed (CO₂, particles or VOC).",
+        "fr": "Le niveau de qualité de l'air d'un moniteur a changé (CO₂, particules ou COV).",
+        "de": "Die Luftqualitätsstufe eines Monitors hat sich geändert (CO₂, Feinstaub oder VOC).",
+        "es": "El nivel de calidad del aire de un monitor ha cambiado (CO₂, partículas o COV)."
       },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "Monitor",
+            "fr": "Moniteur",
+            "de": "Monitor",
+            "es": "Monitor"
+          }
         },
         {
-          "key": "target",
+          "key": "level",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "New level",
+            "fr": "Nouveau niveau",
+            "de": "Neue Stufe",
+            "es": "Nuevo nivel"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "good",
+              "label": {
+                "en": "Good",
+                "fr": "Bonne",
+                "de": "Gut",
+                "es": "Buena"
+              }
+            },
+            {
+              "value": "moderate",
+              "label": {
+                "en": "Moderate",
+                "fr": "Moyenne",
+                "de": "Mäßig",
+                "es": "Moderada"
+              }
+            },
+            {
+              "value": "poor",
+              "label": {
+                "en": "Poor",
+                "fr": "Mauvaise",
+                "de": "Schlecht",
+                "es": "Mala"
+              }
+            },
+            {
+              "value": "bad",
+              "label": {
+                "en": "Very poor",
+                "fr": "Très mauvaise",
+                "de": "Sehr schlecht",
+                "es": "Muy mala"
+              }
+            }
+          ]
+        },
+        {
+          "key": "direction",
+          "type": "select",
+          "label": {
+            "en": "Direction",
+            "fr": "Sens",
+            "de": "Richtung",
+            "es": "Sentido"
+          },
+          "options": [
+            {
+              "value": "worse",
+              "label": {
+                "en": "Getting worse",
+                "fr": "Se dégrade",
+                "de": "Wird schlechter",
+                "es": "Empeora"
+              }
+            },
+            {
+              "value": "better",
+              "label": {
+                "en": "Getting better",
+                "fr": "S'améliore",
+                "de": "Wird besser",
+                "es": "Mejora"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "device_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Monitor name",
+            "fr": "Nom du moniteur",
+            "de": "Name des Monitors",
+            "es": "Nombre del monitor"
+          }
+        },
+        {
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Level (code)",
+            "fr": "Niveau (code)",
+            "de": "Stufe (Code)",
+            "es": "Nivel (código)"
+          }
+        },
+        {
+          "key": "level_label",
+          "type": "string",
+          "label": {
+            "en": "Level",
+            "fr": "Niveau",
+            "de": "Stufe",
+            "es": "Nivel"
+          }
+        },
+        {
+          "key": "previous_level",
+          "type": "string",
+          "label": {
+            "en": "Previous level (code)",
+            "fr": "Niveau précédent (code)",
+            "de": "Vorherige Stufe (Code)",
+            "es": "Nivel anterior (código)"
+          }
+        },
+        {
+          "key": "cause",
+          "type": "string",
+          "label": {
+            "en": "Main pollutant",
+            "fr": "Polluant principal",
+            "de": "Hauptschadstoff",
+            "es": "Contaminante principal"
+          }
+        },
+        {
+          "key": "direction",
+          "type": "string",
+          "label": {
+            "en": "Direction",
+            "fr": "Sens",
+            "de": "Richtung",
+            "es": "Sentido"
+          }
+        },
+        {
+          "key": "co2",
+          "type": "number",
+          "label": {
+            "en": "CO₂ (ppm)",
+            "fr": "CO₂ (ppm)",
+            "de": "CO₂ (ppm)",
+            "es": "CO₂ (ppm)"
+          }
+        },
+        {
+          "key": "pm25",
+          "type": "number",
+          "label": {
+            "en": "PM2.5 (µg/m³)",
+            "fr": "PM2,5 (µg/m³)",
+            "de": "PM2,5 (µg/m³)",
+            "es": "PM2,5 (µg/m³)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "device_stopped_reporting",
+      "label": {
+        "en": "Device stopped reporting",
+        "fr": "Appareil muet",
+        "de": "Gerät meldet nichts mehr",
+        "es": "Dispositivo sin datos"
+      },
+      "description": {
+        "en": "No new reading for two report intervals, or the device is offline (battery, Wi-Fi).",
+        "fr": "Aucune nouvelle mesure depuis deux intervalles de remontée, ou appareil hors ligne (batterie, Wi-Fi).",
+        "de": "Seit zwei Sendeintervallen keine neue Messung, oder das Gerät ist offline (Akku, WLAN).",
+        "es": "Ninguna medida nueva en dos intervalos de envío, o el dispositivo está sin conexión (batería, Wi-Fi)."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Device",
+            "fr": "Appareil",
+            "de": "Gerät",
+            "es": "Dispositivo"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "device_name",
+          "type": "string",
+          "label": {
+            "en": "Device name",
+            "fr": "Nom de l'appareil",
+            "de": "Gerätename",
+            "es": "Nombre del dispositivo"
+          }
+        },
+        {
+          "key": "minutes_since_reading",
+          "type": "number",
+          "label": {
+            "en": "Minutes since the last reading",
+            "fr": "Minutes depuis la dernière mesure",
+            "de": "Minuten seit der letzten Messung",
+            "es": "Minutos desde la última medida"
+          }
+        },
+        {
+          "key": "offline",
+          "type": "boolean",
+          "label": {
+            "en": "Offline for Qingping",
+            "fr": "Hors ligne pour Qingping",
+            "de": "Offline laut Qingping",
+            "es": "Sin conexión para Qingping"
+          }
+        }
+      ]
+    },
+    {
+      "key": "device_reporting_again",
+      "label": {
+        "en": "Device reporting again",
+        "fr": "Appareil de retour",
+        "de": "Gerät meldet wieder",
+        "es": "Dispositivo de vuelta"
+      },
+      "description": {
+        "en": "A device that had stopped reporting sent a new reading.",
+        "fr": "Un appareil devenu muet a envoyé une nouvelle mesure.",
+        "de": "Ein verstummtes Gerät hat eine neue Messung gesendet.",
+        "es": "Un dispositivo que había dejado de enviar datos ha enviado una nueva medida."
+      },
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Device",
+            "fr": "Appareil",
+            "de": "Gerät",
+            "es": "Dispositivo"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "device_name",
+          "type": "string",
+          "label": {
+            "en": "Device name",
+            "fr": "Nom de l'appareil",
+            "de": "Gerätename",
+            "es": "Nombre del dispositivo"
+          }
+        },
+        {
+          "key": "silent_minutes",
+          "type": "number",
+          "label": {
+            "en": "Minutes without reading",
+            "fr": "Minutes sans mesure",
+            "de": "Minuten ohne Messung",
+            "es": "Minutos sin medida"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_air_quality",
+      "label": {
+        "en": "Get the air quality",
+        "fr": "Lire la qualité de l'air",
+        "de": "Luftqualität abrufen",
+        "es": "Obtener la calidad del aire"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "The air quality level of a monitor, in words, for the next actions (message, condition).",
+        "fr": "Le niveau de qualité de l'air d'un moniteur, en mots, pour les actions suivantes (message, condition).",
+        "de": "Die Luftqualitätsstufe eines Monitors in Worten, für die nächsten Aktionen (Nachricht, Bedingung).",
+        "es": "El nivel de calidad del aire de un monitor, en palabras, para las acciones siguientes (mensaje, condición)."
+      },
+      "timeout_seconds": 10,
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "Monitor",
+            "fr": "Moniteur",
+            "de": "Monitor",
+            "es": "Monitor"
+          },
           "required": true
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
+          "key": "level",
+          "type": "string",
+          "label": {
+            "en": "Level (code)",
+            "fr": "Niveau (code)",
+            "de": "Stufe (Code)",
+            "es": "Nivel (código)"
+          }
+        },
+        {
+          "key": "level_number",
+          "type": "number",
+          "label": {
+            "en": "Level (1 good to 4 very poor)",
+            "fr": "Niveau (1 bonne à 4 très mauvaise)",
+            "de": "Stufe (1 gut bis 4 sehr schlecht)",
+            "es": "Nivel (1 buena a 4 muy mala)"
+          }
+        },
+        {
+          "key": "level_label",
+          "type": "string",
+          "label": {
+            "en": "Level",
+            "fr": "Niveau",
+            "de": "Stufe",
+            "es": "Nivel"
+          }
+        },
+        {
+          "key": "cause",
+          "type": "string",
+          "label": {
+            "en": "Main pollutant",
+            "fr": "Polluant principal",
+            "de": "Hauptschadstoff",
+            "es": "Contaminante principal"
+          }
+        },
+        {
+          "key": "co2",
+          "type": "number",
+          "label": {
+            "en": "CO₂ (ppm)",
+            "fr": "CO₂ (ppm)",
+            "de": "CO₂ (ppm)",
+            "es": "CO₂ (ppm)"
+          }
+        },
+        {
+          "key": "pm25",
+          "type": "number",
+          "label": {
+            "en": "PM2.5 (µg/m³)",
+            "fr": "PM2,5 (µg/m³)",
+            "de": "PM2,5 (µg/m³)",
+            "es": "PM2,5 (µg/m³)"
+          }
+        },
+        {
+          "key": "minutes_since_reading",
+          "type": "number",
+          "label": {
+            "en": "Minutes since the reading",
+            "fr": "Minutes depuis la mesure",
+            "de": "Minuten seit der Messung",
+            "es": "Minutos desde la medida"
+          }
+        },
+        {
+          "key": "reporting",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Reading is recent",
+            "fr": "Mesure récente",
+            "de": "Messung ist aktuell",
+            "es": "Medida reciente"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "air_quality",
+      "label": {
+        "en": "Qingping air quality",
+        "fr": "Qualité de l'air Qingping",
+        "de": "Qingping-Luftqualität",
+        "es": "Calidad del aire Qingping"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Air quality in words, CO₂, particles, temperature and age of the reading.",
+        "fr": "Qualité de l'air en clair, CO₂, particules, température et âge de la mesure.",
+        "de": "Luftqualität in Worten, CO₂, Feinstaub, Temperatur und Alter der Messung.",
+        "es": "Calidad del aire en palabras, CO₂, partículas, temperatura y antigüedad de la medida."
+      },
+      "icon": "wind",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Device (empty: all)",
+            "fr": "Appareil (vide : tous)",
+            "de": "Gerät (leer: alle)",
+            "es": "Dispositivo (vacío: todos)"
+          },
+          "required": false
+        }
+      ]
     }
   ]
 }

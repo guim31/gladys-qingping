@@ -1,0 +1,25 @@
+{
+  "total": 1,
+  "devices": [
+    {
+      "info": {
+        "mac": "582D34000005",
+        "product": { "id": 1206, "name": "青萍空气检测仪 2", "en_name": "Qingping Air Monitor 2" },
+        "name": "Kitchen",
+        "version": "1.2.3",
+        "created_at": 1760522000,
+        "status": { "offline": false },
+        "setting": { "report_interval": 900, "collect_interval": 900 }
+      },
+      "data": {
+        "timestamp": { "value": 1760522400 },
+        "battery": { "value": 100, "status": 1 },
+        "temperature": { "value": 22.8, "status": 0 },
+        "humidity": { "value": 51, "status": 0 },
+        "co2": { "value": 400, "status": 2 },
+        "pm25": { "value": 0, "status": 2 },
+        "pm10": { "value": 0, "status": 2 }
+      }
+    }
+  ]
+}

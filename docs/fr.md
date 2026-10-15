@@ -1,67 +1,130 @@
-# Template de démonstration
+# Qingping
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+## Présentation
 
-## Ce que vous obtenez
+Cette intégration amène vos **moniteurs d'air et thermomètres Qingping** dans Gladys, par l'**API cloud officielle de Qingping** — le cloud qu'utilise l'appli Qingping+. Chaque appareil de votre compte Qingping devient un appareil Gladys avec ce qu'il mesure : température, humidité, CO₂, PM2,5, PM10, COV, bruit, pression, batterie, et l'âge de la dernière mesure.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+En plus des valeurs, elle donne un **niveau de qualité de l'air** lisible (Bonne, Moyenne, Mauvaise, Très mauvaise) avec le polluant en cause, un **widget de tableau de bord**, des **déclencheurs de scène** quand la qualité de l'air change ou qu'un appareil se tait, et une **action de scène** qui donne la qualité de l'air en mots.
+
+Modèles visés : Qingping Air Monitor Lite, Air Monitor 2, CO₂ Temp & RH Monitor, les thermo-hygromètres Wi-Fi (avec ou sans sonde), l'hygromètre Lee Guitars, et les capteurs Bluetooth synchronisés par une passerelle Qingping ou l'appli. Tout appareil que renvoie l'API est pris en charge : les fonctionnalités suivent les mesures qu'il remonte.
+
+Developed without the hardware: feedback welcome — développée sans le matériel : vos retours sont les bienvenus. L'intégration a été écrite d'après la documentation de l'API Qingping et les clients open source de la communauté, et testée contre un cloud simulé. Si quelque chose cloche avec votre appareil, ouvrez un ticket sur [github.com/guim31/gladys-qingping/issues](https://github.com/guim31/gladys-qingping/issues).
+
+Cette intégration n'est pas affiliée à Qingping (Qingping Technology / ClearGrass). Qingping est leur marque.
+
+## Prérequis
+
+- Gladys Assistant 5.1.0 ou plus récent.
+- Vos appareils ajoutés dans l'appli **Qingping+**, en **mode Qingping** (un appareil appairé en mode HomeKit ne remonte rien au cloud Qingping).
+- Un accès développeur gratuit sur [developer.qingping.co](https://developer.qingping.co), avec le même compte que l'appli.
+- Gladys doit joindre Internet (`oauth.cleargrass.com` et `apis.cleargrass.com`, en HTTPS).
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+### Obtenir l'App Key et l'App Secret
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+1. Ajoutez vos appareils dans l'appli Qingping+ et vérifiez qu'ils y affichent des valeurs.
+2. Connectez-vous à [developer.qingping.co](https://developer.qingping.co) avec le compte de l'appli (même région).
+3. Ouvrez **Access Management** ([lien direct](https://developer.qingping.co/personal/permissionApply)) et copiez l'**App Key** et l'**App Secret**. C'est gratuit.
 
-## Actions
+### Réglages
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+- **App Key** et **App Secret** : copiés depuis Access Management. Le secret est conservé par Gladys et jamais écrit dans les logs.
+- **Lecture du cloud** : _Automatique (conseillé)_ lit le cloud juste après chaque remontée attendue des appareils, d'après leur intervalle de remontée. On peut choisir à la place un intervalle fixe (de 5 minutes à une heure).
+- **Langue des fonctionnalités** : les noms donnés aux fonctionnalités quand vous ajoutez un appareil (figés ensuite), et la langue des textes envoyés aux scènes. Français par défaut.
 
-## Scènes
+Cliquez sur **Tester la connexion** : le résultat liste vos appareils et l'âge de leur dernière mesure. Ouvrez ensuite l'onglet **Découverte** et ajoutez les appareils voulus.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+**À quel rythme les valeurs changent.** Le cloud ne connaît que ce que les appareils ont remonté. Un moniteur d'air sur batterie remonte toutes les **15 minutes** par défaut (l'intervalle de remontée de l'appli Qingping+) ; branché, il peut remonter chaque minute. Un thermomètre Bluetooth remonte quand l'appli ou une passerelle le synchronise. Lire le cloud plus souvent n'apporte aucune valeur plus fraîche : en mode automatique, l'intégration le lit une fois par remontée attendue — jamais plus d'une fois toutes les 2 minutes, jamais moins d'une fois par heure. Une seule requête lit tous les appareils du compte.
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+**Quotas.** Qingping ne publie aucun quota de requêtes pour son API ouverte. L'intégration fait une demande de jeton environ toutes les 2 heures (le jeton est gardé dans `/data` : un redémarrage n'en redemande pas) et une requête par lecture — une centaine par jour avec une remontée toutes les 15 minutes. Quand le cloud répond « trop de requêtes », elle attend au moins 15 minutes, ou plus si le cloud le demande.
 
-## Tableau de bord
+## Appareils
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Un appareil Gladys par appareil de votre compte Qingping, nommé comme dans l'appli Qingping+. Son identité est son adresse MAC : le renommer dans l'appli le garde dans Gladys.
+
+### Fonctionnalités
+
+Chaque appareil reçoit les fonctionnalités des mesures qu'il remonte, toutes en lecture seule :
+
+| Fonctionnalité          | Unité | Modèles                                          |
+| ----------------------- | ----- | ------------------------------------------------ |
+| Température             | °C    | tous                                             |
+| Température de la sonde | °C    | thermomètres à sonde externe                     |
+| Humidité                | %     | tous                                             |
+| CO₂                     | ppm   | moniteurs d'air, moniteur de CO₂                 |
+| PM2,5                   | µg/m³ | moniteurs d'air                                  |
+| PM10                    | µg/m³ | moniteurs d'air                                  |
+| COV                     | ppb   | Air Monitor (première génération)                |
+| Indice COV              | 1–500 | Air Monitor 2 (100 = l'air habituel de la pièce) |
+| Bruit                   | dB    | Air Monitor 2                                    |
+| Pression                | kPa   | thermomètres avec baromètre                      |
+| Batterie                | %     | appareils sur batterie                           |
+| Âge de la mesure        | min   | tous : minutes depuis la dernière remontée       |
+
+L'**Âge de la mesure** distingue une valeur stable d'une valeur figée : s'il dépasse deux fois l'intervalle de remontée, l'appareil ne remonte plus (batterie, Wi-Fi, hors de portée). Le badge de l'appareil passe alors à « injoignable ».
+
+Une mesure qu'un appareil se met à remonter plus tard (un capteur qui chauffe après un redémarrage) ajoute sa fonctionnalité : Gladys propose alors **Mettre à jour** dans l'onglet Découverte. Un capteur qui se déclare en panne ou en préchauffage ne publie rien, plutôt qu'une valeur fausse.
+
+### Niveau de qualité de l'air
+
+Chaque moniteur reçoit un niveau de qualité de l'air, le pire de ses polluants :
+
+| Niveau        | CO₂ (ppm)    | PM2,5 (µg/m³) | PM10 (µg/m³) | COV (ppb)    | Indice COV   |
+| ------------- | ------------ | ------------- | ------------ | ------------ | ------------ |
+| Bonne         | moins de 800 | moins de 15   | moins de 45  | moins de 220 | moins de 150 |
+| Moyenne       | 800–999      | 15–34         | 45–99        | 220–659      | 150–249      |
+| Mauvaise      | 1000–1999    | 35–54         | 100–199      | 660–2199     | 250–399      |
+| Très mauvaise | 2000 et plus | 55 et plus    | 200 et plus  | 2200 et plus | 400 et plus  |
+
+Les seuils suivent les valeurs guides de l'air intérieur de l'Agence fédérale allemande de l'environnement (CO₂, COV), les lignes directrices 2021 de l'OMS et les seuils de l'US EPA (particules). Pour éviter les va-et-vient, un niveau ne redescend qu'une fois la valeur 5 % sous le seuil franchi. Température, humidité et bruit ne comptent pas : c'est du confort, pas de la qualité de l'air. Un thermomètre n'a pas de niveau de qualité de l'air.
+
+## Widget du tableau de bord
+
+**Qualité de l'air Qingping** : ajoutez-le à un tableau de bord et choisissez un appareil, ou laissez l'appareil vide pour les voir tous.
+
+- Un appareil : son nom, jusqu'à six tuiles (CO₂, PM2,5, température, humidité, PM10, COV…) colorées selon le niveau, puis la qualité de l'air en mots avec sa cause (par exemple _Mauvaise · CO₂_), l'âge de la dernière mesure et la batterie.
+- Tous les appareils : une ligne par appareil avec sa qualité de l'air, ou sa température et son humidité pour un thermomètre.
+
+Un appareil qui ne remonte plus affiche _Pas de mesure récente_ au lieu d'un niveau figé. Le widget fonctionne même avant l'ajout des appareils dans Gladys.
+
+## Déclencheurs de scène
+
+- **Qualité de l'air changée** : le niveau d'un moniteur a changé. Filtres : le moniteur, le nouveau niveau, le sens (_Se dégrade_ ou _S'améliore_). Variables : nom du moniteur, niveau, niveau précédent, polluant principal, sens, CO₂ et PM2,5.
+- **Appareil muet** : aucune nouvelle mesure depuis deux intervalles de remontée (30 minutes au moins), ou le cloud Qingping dit l'appareil hors ligne. Variables : nom de l'appareil, minutes depuis la dernière mesure, hors ligne pour Qingping.
+- **Appareil de retour** : un appareil devenu muet a envoyé une nouvelle mesure. Variable : minutes sans mesure.
+
+Pour réagir à une valeur qui franchit un seuil (CO₂ au-dessus de 1200 ppm, température sous 5 °C), utilisez le déclencheur habituel de Gladys sur la fonctionnalité de l'appareil : il compare déjà les valeurs.
+
+## Action de scène
+
+**Lire la qualité de l'air** : lit la qualité de l'air d'un moniteur d'après sa dernière mesure (sans requête au cloud) et donne aux actions suivantes de la scène : le niveau (code, nombre de 1 Bonne à 4 Très mauvaise, et libellé), le polluant principal, le CO₂, les PM2,5, les minutes depuis la mesure et si la mesure est récente. À utiliser dans un message (_« Air de la chambre : {niveau} »_) ou dans une condition « continuer seulement si ».
+
+## Actions de configuration
+
+- **Tester la connexion** : lit le cloud tout de suite et liste les appareils avec l'âge de leur mesure.
+- **Régler l'intervalle de remontée** : change la fréquence de remontée d'un **moniteur d'air** (de 1 minute à 1 heure). L'appareil l'applique à sa prochaine remontée, et l'intégration suit le nouveau rythme. Un intervalle court vide la batterie bien plus vite : gardez 15 minutes sur batterie. Les autres appareils (thermomètres) se règlent dans l'appli Qingping+.
+
+## Exemples de scènes
+
+- **Aérer la chambre** : déclencheur _Qualité de l'air changée_, moniteur _Chambre_, nouveau niveau _Mauvaise_ et _Très mauvaise_, sens _Se dégrade_ → envoyer « Ouvrez la fenêtre de la chambre : {polluant principal} élevé », ou allumer la VMC.
+- **L'air est redevenu bon** : déclencheur _Qualité de l'air changée_, nouveau niveau _Bonne_, sens _S'améliore_ → éteindre la VMC.
+- **Vérifier le moniteur** : déclencheur _Appareil muet_ → envoyer « {nom de l'appareil} ne remonte plus depuis {minutes} min : batterie ou Wi-Fi ? ».
+- **Bilan du matin** : chaque jour à 7 h → _Lire la qualité de l'air_ de la chambre → envoyer « Air de la chambre : {niveau}, CO₂ {co2} ppm ».
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« App Key ou App Secret refusé »** : recopiez les deux depuis Access Management, sans espace, puis enregistrez. Vérifiez que vous vous êtes connecté à developer.qingping.co avec le compte de l'appli.
+- **Connecté, mais aucun appareil** : les appareils doivent être dans l'appli Qingping+ du même compte, en mode Qingping (pas HomeKit). Un appareil appairé seulement en HomeKit n'atteint pas le cloud Qingping.
+- **Les valeurs ne bougent pas** : regardez l'_Âge de la mesure_. S'il grandit, l'appareil ne remonte pas (batterie, Wi-Fi, passerelle). S'il reste bas, les valeurs sont simplement stables.
+- **Une fonctionnalité manque** : attendez une mesure où le capteur la remonte (un capteur de CO₂ chauffe quelques minutes après un redémarrage), puis cliquez sur **Mettre à jour** sur l'appareil dans l'onglet Découverte.
+- **Plus de détails** : réglez `LOG_LEVEL=debug` sur l'intégration pour voir chaque lecture dans ses logs. L'App Secret et le jeton n'y apparaissent jamais.
+
+## Limites
+
+- Cloud seulement : l'intégration lit le cloud Qingping, jamais les appareils sur votre réseau. Sans Internet, les valeurs s'arrêtent (les appareils gardent leur historique dans le cloud).
+- Les valeurs sont aussi fraîches que les remontées des appareils : 15 minutes par défaut sur batterie.
+- Lecture seule : le seul réglage que l'intégration modifie est l'intervalle de remontée des moniteurs d'air, à la demande.
+- Un trou d'historique pendant que Gladys était éteint n'est pas rattrapé : seule la dernière mesure est lue.
+- Les appareils que le cloud Qingping n'expose pas (mode HomeKit, certains capteurs Bluetooth sans passerelle) ne peuvent pas apparaître.
+- Développée sans le matériel ni compte : les réponses de l'API ont été reconstituées d'après la documentation Qingping et les clients de la communauté. Signalez toute bizarrerie sur [github.com/guim31/gladys-qingping/issues](https://github.com/guim31/gladys-qingping/issues).

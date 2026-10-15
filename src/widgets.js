@@ -1,169 +1,240 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// Dashboard widget (manifest `widgets`, Gladys 5.1+): `air_quality`.
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
+// The use case: a glance at the wall tablet tells whether to open a window.
+// So the widget says the air quality in words (good, moderate, poor, very
+// poor), what drives it (CO₂, particles, VOC), and whether the reading is
+// recent — a monitor whose battery died shows a frozen "good" otherwise.
 //
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
+// One device (chosen in the widget settings, or the only one of the account):
+// its figures as tiles (CO₂, PM2.5, temperature, humidity… up to six), a
+// status list (air quality, latest reading, battery). Every device otherwise:
+// one status row each. The figures are sent as values, not bound to device
+// features, so the widget works before the devices are added to Gladys.
 //
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// Read only, no button: the air is not something to command.
+// Budget: 1 heading, 6 tiles, 1 status list (8 components at most).
 // -----------------------------------------------------------------------------
 
-import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
-  WIDGET_COLORS,
-} from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import { WIDGET_COLORS } from '@gladysassistant/integration-sdk';
+import { THRESHOLDS, rawLevel } from './airQuality.js';
+import { deviceName } from './devices.js';
+import { WIDGET_KEY } from './hub.js';
+import { CAUSE_TEXT, ERROR_TEXT, LEVEL_TEXT, pick } from './texts.js';
 
-const logger = createLogger({ name: 'widgets' });
-
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
-
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
+export const TEXT = {
+  noDevice: {
+    en: 'No Qingping device on the account yet: add your devices in the Qingping+ app.',
+    fr: "Aucun appareil Qingping sur le compte : ajoutez vos appareils dans l'appli Qingping+.",
+    de: 'Noch kein Qingping-Gerät im Konto: Füge deine Geräte in der Qingping+-App hinzu.',
+    es: 'Todavía no hay ningún dispositivo Qingping en la cuenta: añádalos en la aplicación Qingping+.',
   },
+  unknown: {
+    en: 'This device is no longer on the Qingping account: choose another one in the widget settings.',
+    fr: "Cet appareil n'est plus sur le compte Qingping : choisissez-en un autre dans les réglages du widget.",
+    de: 'Dieses Gerät ist nicht mehr im Qingping-Konto: Wähle ein anderes in den Widget-Einstellungen.',
+    es: 'Este dispositivo ya no está en la cuenta de Qingping: elija otro en la configuración del widget.',
+  },
+  airQuality: {
+    en: 'Air quality',
+    fr: "Qualité de l'air",
+    de: 'Luftqualität',
+    es: 'Calidad del aire',
+  },
+  reading: {
+    en: 'Latest reading',
+    fr: 'Dernière mesure',
+    de: 'Letzte Messung',
+    es: 'Última medida',
+  },
+  battery: { en: 'Battery', fr: 'Batterie', de: 'Batterie', es: 'Batería' },
+  stale: {
+    en: 'No recent reading',
+    fr: 'Pas de mesure récente',
+    de: 'Keine aktuelle Messung',
+    es: 'Sin medida reciente',
+  },
+  offline: { en: 'Offline', fr: 'Hors ligne', de: 'Offline', es: 'Sin conexión' },
+  waiting: { en: 'Waiting…', fr: 'En attente…', de: 'Warte…', es: 'Esperando…' },
+  now: { en: 'just now', fr: "à l'instant", de: 'gerade eben', es: 'ahora mismo' },
+  ago: { en: '{n} min ago', fr: 'il y a {n} min', de: 'vor {n} min', es: 'hace {n} min' },
+  hoursAgo: { en: '{n} h ago', fr: 'il y a {n} h', de: 'vor {n} h', es: 'hace {n} h' },
+  temperature: { en: 'Temperature', fr: 'Température', de: 'Temperatur', es: 'Temperatura' },
+  humidity: { en: 'Humidity', fr: 'Humidité', de: 'Feuchtigkeit', es: 'Humedad' },
+  noise: { en: 'Noise', fr: 'Bruit', de: 'Lärm', es: 'Ruido' },
+  vocIndex: { en: 'VOC index', fr: 'Indice COV', de: 'VOC-Index', es: 'Índice COV' },
 };
 
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+// Tiles, by priority: air quality first, comfort after.
+const TILES = [
+  { key: 'co2', label: CAUSE_TEXT.co2, unit: 'ppm', icon: 'wind' },
+  { key: 'pm25', label: CAUSE_TEXT.pm25, unit: 'µg/m³', icon: 'cloud' },
+  { key: 'temperature', label: TEXT.temperature, unit: '°C', icon: 'thermometer', decimals: 1 },
+  { key: 'humidity', label: TEXT.humidity, unit: '%', icon: 'droplet' },
+  { key: 'pm10', label: CAUSE_TEXT.pm10, unit: 'µg/m³', icon: 'cloud' },
+  { key: 'tvoc', label: CAUSE_TEXT.tvoc, unit: 'ppb', icon: 'activity' },
+  { key: 'tvoc_index', label: TEXT.vocIndex, icon: 'activity' },
+  { key: 'noise', label: TEXT.noise, unit: 'dB', icon: 'volume-2' },
+];
+const MAX_TILES = 6;
+
+export const LEVEL_COLORS = {
+  good: WIDGET_COLORS.SUCCESS,
+  moderate: WIDGET_COLORS.WARNING,
+  poor: WIDGET_COLORS.DANGER,
+  bad: WIDGET_COLORS.DANGER,
+};
+const METRIC_COLORS = [
+  WIDGET_COLORS.SUCCESS,
+  WIDGET_COLORS.WARNING,
+  WIDGET_COLORS.DANGER,
+  WIDGET_COLORS.DANGER,
+];
+
+const t = (text, language) => pick(text, language);
+const fit = (text, max) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
+/** A number the way the language writes it (decimal comma in fr, de, es). */
+export const formatNumber = (value, decimals, language) => {
+  const text = (Math.round(value * 10 ** decimals) / 10 ** decimals).toFixed(decimals);
+  return language === 'en' ? text : text.replace('.', ',');
+};
+
+function message(text, language) {
+  return {
+    ttl_seconds: 300,
+    components: [{ type: 'text', variant: 'body', text: t(text, language) }],
+  };
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
+/** "Poor · CO₂" */
+function levelText(record, language) {
+  const { level, cause } = record.air;
+  const label = t(LEVEL_TEXT[level], language);
+  return cause ? `${label} · ${t(CAUSE_TEXT[cause], language)}` : label;
+}
+
+function ageText(minutes, language) {
+  if (minutes < 1) {
+    return t(TEXT.now, language);
+  }
+  if (minutes < 120) {
+    return t(TEXT.ago, language).replace('{n}', String(minutes));
+  }
+  return t(TEXT.hoursAgo, language).replace('{n}', String(Math.floor(minutes / 60)));
+}
+
+/** The "Latest reading" status value, with its color. */
+function readingItem(hub, record, language) {
+  const age = hub.ageMinutes(record);
+  if (age === null) {
+    return { value: t(TEXT.waiting, language), color: WIDGET_COLORS.NEUTRAL };
+  }
+  if (record.device.offline) {
+    return { value: t(TEXT.offline, language), color: WIDGET_COLORS.WARNING };
+  }
+  if (!record.reporting) {
+    return { value: t(TEXT.stale, language), color: WIDGET_COLORS.WARNING };
+  }
+  return { value: ageText(age, language), color: WIDGET_COLORS.NEUTRAL };
+}
+
+/** Summary row of one device (all-devices view). */
+function deviceRow(hub, record, language) {
+  const label = fit(deviceName(record.device), 40);
+  const reading = readingItem(hub, record, language);
+  if (record.readingAt === null || !record.reporting) {
+    return { label, icon: 'alert-triangle', ...reading };
+  }
+  if (record.air.level) {
     return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
+      label,
+      icon: 'wind',
+      value: fit(levelText(record, language), 40),
+      color: LEVEL_COLORS[record.air.level],
     };
   }
-  return { value, color };
+  // A thermometer: its figures.
+  const parts = [];
+  if (typeof record.values.temperature === 'number') {
+    parts.push(`${formatNumber(record.values.temperature, 1, language)} °C`);
+  }
+  if (typeof record.values.humidity === 'number') {
+    parts.push(`${formatNumber(record.values.humidity, 0, language)} %`);
+  }
+  return {
+    label,
+    icon: 'thermometer',
+    value: fit(parts.join(' · ') || reading.value, 40),
+    color: WIDGET_COLORS.NEUTRAL,
+  };
+}
+
+function detail(hub, record, language) {
+  const components = [
+    { type: 'text', variant: 'heading', text: fit(deviceName(record.device), 40) },
+  ];
+  const tiles = TILES.filter(({ key }) => typeof record.values[key] === 'number').slice(
+    0,
+    MAX_TILES,
+  );
+  for (const tile of tiles) {
+    const value = record.values[tile.key];
+    components.push({
+      type: 'value',
+      value: Math.round(value * 10 ** (tile.decimals ?? 0)) / 10 ** (tile.decimals ?? 0),
+      ...(tile.unit ? { unit: tile.unit } : {}),
+      label: t(tile.label, language),
+      icon: tile.icon,
+      ...(THRESHOLDS[tile.key] ? { color: METRIC_COLORS[rawLevel(tile.key, value)] } : {}),
+    });
+  }
+  const items = [];
+  if (record.air.level) {
+    items.push({
+      label: t(TEXT.airQuality, language),
+      icon: 'wind',
+      value: fit(levelText(record, language), 40),
+      color: LEVEL_COLORS[record.air.level],
+    });
+  }
+  items.push({
+    label: t(TEXT.reading, language),
+    icon: 'clock',
+    ...readingItem(hub, record, language),
+  });
+  if (typeof record.values.battery === 'number') {
+    const battery = Math.round(record.values.battery);
+    items.push({
+      label: t(TEXT.battery, language),
+      icon: 'battery',
+      value: `${battery} %`,
+      color: battery <= 15 ? WIDGET_COLORS.WARNING : WIDGET_COLORS.NEUTRAL,
+    });
+  }
+  components.push({ type: 'status', items });
+  return components;
+}
+
+async function get(hub, { settings, language = 'en' }) {
+  if (hub.error && hub.records.size === 0) {
+    return message(ERROR_TEXT[hub.error.kind], language);
+  }
+  if (hub.records.size === 0) {
+    return message(TEXT.noDevice, language);
+  }
+  const records = hub.view(settings?.device);
+  if (records.length === 0) {
+    return message(TEXT.unknown, language);
+  }
+  const components =
+    records.length === 1
+      ? detail(hub, records[0], language)
+      : [{ type: 'status', items: records.slice(0, 10).map((r) => deviceRow(hub, r, language)) }];
+  // The data moves at the pace of the uploads; the hub nudges on each new one.
+  return { ttl_seconds: 300, components };
 }
 
 export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
+  [WIDGET_KEY]: { get },
 };
-
-/**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
- */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
-  }
-}

@@ -31,16 +31,23 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only (src/app.js registers the handlers before connect())
+src/app.js                        registerHandlers(gladys, seams): every SDK handler, shared by the tests
+src/hub.js                        QingpingHub: reading timer, devices, states, transitions, actions
+src/qingping/client.js            Qingping open API: OAuth token (kept in /data), device list, settings
+src/qingping/model.js             parsing of the API answers (metrics, intervals, timestamps)
+src/airQuality.js                 air quality level (good/moderate/poor/bad), thresholds, hysteresis
+src/devices.js                    device and feature payloads (external ids, names in 4 languages)
+src/scenes.js                     scene action handler (manifest `scene_actions`)
+src/widgets.js                    dashboard widget `air_quality` (manifest `widgets`)
+src/texts.js                      every text sent to Gladys outside the widget, in 4 languages
+src/store.js                      /data/qingping-state.json (token, metrics learnt), mode 0600
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+scripts/probe.mjs                 read-only probe of the real cloud (prints shapes, never secrets)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (same sections)
+test/                             node --test, against the SDK's fake Gladys and a fake cloud
+test/fixtures/qingping/           reconstructed API answers (see its README)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +77,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German with
+  "du", Spanish with "usted"): action messages, manifest texts, widget texts,
+  feature names, and `docs/en.md`, `docs/fr.md`, `docs/de.md`, `docs/es.md`
+  with the same sections. `test/i18n.test.js` enforces it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +242,27 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Intégration Qingping (API cloud)
+
+- **API** (developer.qingping.co, SDK Go officiel `ClearGrass/OpenapiSdkGo`, sans licence : lecture seule) :
+  jeton OAuth 2 « client credentials » `POST https://oauth.cleargrass.com/oauth2/token` (App Key/App Secret en
+  Basic, `scope=device_full_access`, `expires_in` ≈ 7200 s) ; `GET https://apis.cleargrass.com/v1/apis/devices`
+  (`offset`, `limit`, `timestamp` **en millisecondes**) rend `{ total, devices: [{ info, data }] }` avec la
+  dernière mesure de chaque appareil ; `PUT /v1/apis/devices/settings` (`mac[]`, `report_interval`,
+  `collect_interval` en secondes, moniteurs d'air seulement). Dans `data`, `timestamp.value` est **en secondes**.
+- **Injoignable depuis la session de code** (proxy 403 sur `*.cleargrass.com` et `developer.qingping.co`) :
+  les fixtures sont **reconstituées** (`test/fixtures/qingping/README.md`), pas capturées. `scripts/probe.mjs`
+  éprouve le vrai cloud et n'affiche que des formes : c'est par lui qu'on les remplacera.
+- Le cloud ne sait que ce que les appareils ont remonté (intervalle de remontée de l'appli, 15 min par défaut sur
+  batterie) : lire plus souvent ne sert à rien. Le minuteur vise la prochaine remontée attendue
+  (`readingAt + report_interval + 90 s`), borné entre 2 min et 1 h. Aucun quota publié.
+- Le `status` d'une mesure vaut 0 normal, 1 anormal, 2 préchauffage : ne rien publier pour 1 et 2. Pour
+  `battery`, c'est l'état de charge (0/1/2), pas une santé.
+- Les fonctionnalités suivent les métriques **déjà vues** (mémorisées dans `/data`) : un capteur en préchauffage
+  ne doit jamais retirer une fonctionnalité (sinon « Mettre à jour » en boucle dans Découverte).
+- `voc-index-sensor/integer` (« Indice COV Sensirion ») convient au `tvoc_index` de l'Air Monitor 2 (SGP40,
+  1–500) ; `voc-sensor/decimal` en ppb pour `tvoc`. L'âge de la mesure est un `duration/integer` en minutes,
+  borné à une semaine.
+- Les états ne partent que pour les appareils **ajoutés** (`gladys.devices`) : l'âge de la mesure change à chaque
+  lecture, le publier pour des appareils non ajoutés gaspillerait le quota de 300 états/min.

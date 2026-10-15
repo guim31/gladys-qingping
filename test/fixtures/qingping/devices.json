@@ -1,0 +1,95 @@
+{
+  "total": 4,
+  "devices": [
+    {
+      "info": {
+        "mac": "582D34000001",
+        "product": {
+          "id": 1203,
+          "name": "青萍空气检测仪 Lite",
+          "en_name": "Qingping Air Monitor Lite"
+        },
+        "name": "Living room",
+        "version": "1.0.6_0104",
+        "created_at": 1735500000,
+        "group_id": 0,
+        "group_name": "",
+        "status": { "offline": false },
+        "setting": { "report_interval": 900, "collect_interval": 900 }
+      },
+      "data": {
+        "timestamp": { "value": 1760522400 },
+        "battery": { "value": 100, "status": 2 },
+        "temperature": { "value": 26.4, "status": 0 },
+        "humidity": { "value": 44.3, "status": 0 },
+        "co2": { "value": 1053 },
+        "pm25": { "value": 12 },
+        "pm10": { "value": 12 }
+      }
+    },
+    {
+      "info": {
+        "mac": "582D34000002",
+        "product": {
+          "id": 1201,
+          "name": "青萍二氧化碳和温湿度检测仪",
+          "en_name": "CO2& Temp & RH Monitor"
+        },
+        "name": "Bedroom",
+        "version": "2.1.0",
+        "created_at": 1735500100,
+        "status": { "offline": false },
+        "setting": { "report_interval": 600, "collect_interval": 300 }
+      },
+      "data": {
+        "timestamp": { "value": 1760522220 },
+        "battery": { "value": 87, "status": 0 },
+        "signal": { "value": -61 },
+        "temperature": { "value": 21.4 },
+        "humidity": { "value": 56 },
+        "co2": { "value": 959 }
+      }
+    },
+    {
+      "info": {
+        "mac": "582D34000003",
+        "product": { "id": 1206, "name": "青萍空气检测仪 2", "en_name": "Qingping Air Monitor 2" },
+        "name": "Office",
+        "version": "1.2.3",
+        "created_at": 1735500200,
+        "status": { "offline": false },
+        "setting": { "report_interval": 300, "collect_interval": 60 }
+      },
+      "data": {
+        "timestamp": { "value": 1760522580 },
+        "battery": { "value": 64, "status": 1 },
+        "temperature": { "value": 23.1, "status": 0 },
+        "humidity": { "value": 48.6, "status": 0 },
+        "co2": { "value": 612 },
+        "pm25": { "value": 4, "status": 0 },
+        "pm10": { "value": 6, "status": 0 },
+        "tvoc_index": { "value": 92 },
+        "noise": { "value": 38, "status": 0 }
+      }
+    },
+    {
+      "info": {
+        "mac": "582D34000004",
+        "product": { "id": 1102, "name": "青萍温湿度计", "en_name": "Qingping Temp & RH Monitor" },
+        "name": "Cellar",
+        "version": "1.1.2",
+        "created_at": 1735500300,
+        "status": { "offline": false },
+        "setting": { "report_interval": 3600, "collect_interval": 900 }
+      },
+      "data": {
+        "timestamp": { "value": 1760520600 },
+        "battery": { "value": 15 },
+        "temperature": { "value": 13.7 },
+        "humidity": { "value": 78.2 },
+        "pressure": { "value": 101.32 },
+        "prob_temperature": { "value": 4.2 }
+      }
+    }
+  ]
+}

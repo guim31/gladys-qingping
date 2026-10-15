@@ -8,8 +8,8 @@
     "de": "Qingping-Luftmonitore und Thermometer über die Qingping-Cloud: CO₂, Feinstaub, VOC, Temperatur.",
     "es": "Monitores de aire y termómetros Qingping vía la nube Qingping: CO₂, partículas, COV, temperatura."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/guim31/gladys-qingping:1.0.0",
+  "version": "1.0.1",
+  "docker_image": "ghcr.io/guim31/gladys-qingping:1.0.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/guim31/gladys-qingping/main/cover.png",
   "categories": ["environment"],
